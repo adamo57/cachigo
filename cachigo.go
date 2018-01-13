@@ -1,6 +1,7 @@
 package cachigo
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"log"
@@ -67,7 +68,6 @@ func (cs *CachingService) Put(key string, value interface{}) error {
 			err = b.Put([]byte(key), enc)
 			return err
 		})
-
 		return nil
 	}
 }
@@ -87,4 +87,21 @@ func (cs *CachingService) Delete(key string) error {
 		})
 	}
 	return nil
+}
+
+//Get will lookup a key and return the keys value if found.
+func (cs *CachingService) Get(needle string) ([]byte, error) {
+	var ret []byte
+	cs.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(bucketname)
+		c := b.Cursor()
+		bn := []byte(needle)
+
+		for k, v := c.First(); k != nil && bytes.Contains(bn, k); k, v = c.Next() {
+			ret = v
+			return nil
+		}
+		return nil
+	})
+	return ret, nil
 }
