@@ -9,7 +9,7 @@ import (
 	"github.com/boltdb/bolt"
 )
 
-//CachingSevice
+//CachingSevice is the db.
 type CachingService struct {
 	db *bolt.DB
 }
@@ -17,13 +17,17 @@ type CachingService struct {
 var (
 	bucketname = []byte("cachigo")
 
+	//ErrEmptyKey is an error that should only happen when an empty key is
+	//given to be deleted from the db
+	ErrEmptyKey = errors.New("Empty key")
+
 	//ErrBadValue is an error that should only happen when
 	//there is a bad value trying to be stored.
-	ErrBadValue = errors.New("Bad key")
+	ErrBadValue = errors.New("Bad value")
 )
 
 //Open handles the opening of the bolt instance. Path is the full path to the database file.
-// 0640 opend the file with -rw-r----- permissions
+// 0640 opens the file with -rw-r----- permissions
 func Open(path string) (*CachingService, error) {
 	boltOptions := &bolt.Options{
 		Timeout: 15 * time.Second,
@@ -44,6 +48,11 @@ func Open(path string) (*CachingService, error) {
 	}
 }
 
+//Close closes the db
+func (cs *CachingService) Close() error {
+	return cs.db.Close()
+}
+
 //Put inserts a key and a value into the data store
 func (cs *CachingService) Put(key string, value interface{}) error {
 	if value == nil {
@@ -58,7 +67,24 @@ func (cs *CachingService) Put(key string, value interface{}) error {
 			err = b.Put([]byte(key), enc)
 			return err
 		})
-	}
 
+		return nil
+	}
+}
+
+//Delete removes the key from the data store.
+func (cs *CachingService) Delete(key string) error {
+	if key == "" {
+		return ErrEmptyKey
+	} else {
+		cs.db.Update(func(tx *bolt.Tx) error {
+			b := tx.Bucket(bucketname)
+			err := b.Delete([]byte(key))
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+	}
 	return nil
 }
